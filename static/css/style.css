@@ -1,0 +1,27 @@
+/* FILE: static/css/style.css */
+.form-error {
+    color: #dc3545;
+    font-size: 0.97em;
+    margin-top: 0.2em;
+}
+
+body {
+    background: #f8fafc;
+}
+
+.container {
+    max-width: 440px;
+    background: #fff;
+    padding: 36px 28px;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.11);
+}
+
+h2 {
+    margin-bottom: 24px;
+    font-weight: 600;
+}
+
+button[type="submit"], #logoutBtn {
+    margin-top: 8px;
+}
