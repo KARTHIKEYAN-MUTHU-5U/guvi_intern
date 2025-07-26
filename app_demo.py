@@ -77,7 +77,7 @@ mock_products = [
 # Routes
 @app.route("/")
 def home_page():
-    return render_template("index.html")
+    return render_template("index_standalone.html")
 
 @app.route("/login")
 def login_page():
@@ -93,7 +93,7 @@ def profile_page():
 
 @app.route("/shop")
 def shop_page():
-    return render_template("shop.html")
+    return render_template("shop_standalone.html")
 
 @app.route("/cart")
 def cart_page():
