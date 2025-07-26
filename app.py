@@ -1,8 +1,15 @@
 from flask import Flask, request, jsonify, render_template, redirect, send_from_directory, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from utils.mysql_helper import register_user, validate_login
-from utils.mongo_helper import get_profile, update_profile, set_profile_pic, get_profile_pic_path
+from utils.mysql_helper import (
+    register_user, validate_login, get_all_products, get_product_by_id, 
+    search_products, create_order, add_order_item, get_user_orders, 
+    get_order_items, update_product_stock
+)
+from utils.mongo_helper import (
+    get_profile, update_profile, set_profile_pic, get_profile_pic_path,
+    get_cart, add_to_cart, update_cart_item, remove_from_cart, clear_cart, get_cart_item_count
+)
 from utils.redis_helper import create_session, get_session_email, delete_session
 from config import UPLOAD_FOLDER, ALLOWED_EXTENSIONS, MAX_CONTENT_LENGTH, SESSION_COOKIE_NAME, SESSION_EXPIRE_SECONDS
 import os
@@ -31,6 +38,10 @@ def require_session(func):
     return wrapper
 
 @app.route("/")
+def home_page():
+    return render_template("index.html")
+
+@app.route("/login")
 def login_page():
     return render_template("login.html")
 
@@ -41,6 +52,18 @@ def register_page():
 @app.route("/profile")
 def profile_page():
     return render_template("profile.html")
+
+@app.route("/shop")
+def shop_page():
+    return render_template("shop.html")
+
+@app.route("/cart")
+def cart_page():
+    return render_template("cart.html")
+
+@app.route("/checkout")
+def checkout_page():
+    return render_template("checkout.html")
 
 @app.route("/api/register", methods=["POST"])
 def api_register():
@@ -164,6 +187,170 @@ def api_upload_profile_pic(email):
 @app.route("/static/uploads/<filename>")
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# Products API endpoints
+@app.route("/api/products", methods=["GET"])
+def api_get_products():
+    try:
+        search_query = request.args.get('search', '')
+        if search_query:
+            products = search_products(search_query)
+        else:
+            products = get_all_products()
+        
+        # Convert image URLs to use placeholder service if needed
+        for product in products:
+            if not product['image_url'] or not os.path.exists(product['image_url']):
+                # Use placeholder images for demo
+                product['image_url'] = f"https://picsum.photos/300/200?random={product['id']}"
+        
+        return jsonify(products)
+    except Exception as e:
+        print("Products fetch error:", e)
+        return jsonify({"error": "Failed to fetch products."}), 500
+
+@app.route("/api/products/<int:product_id>", methods=["GET"])
+def api_get_product(product_id):
+    try:
+        product = get_product_by_id(product_id)
+        if not product:
+            return jsonify({"error": "Product not found."}), 404
+        
+        # Use placeholder image if needed
+        if not product['image_url'] or not os.path.exists(product['image_url']):
+            product['image_url'] = f"https://picsum.photos/300/200?random={product['id']}"
+        
+        return jsonify(product)
+    except Exception as e:
+        print("Product fetch error:", e)
+        return jsonify({"error": "Failed to fetch product."}), 500
+
+# Shopping cart API endpoints
+@app.route("/api/cart", methods=["GET"])
+@require_session
+def api_get_cart(email):
+    try:
+        cart = get_cart(email)
+        return jsonify(cart)
+    except Exception as e:
+        print("Cart fetch error:", e)
+        return jsonify({"error": "Failed to fetch cart."}), 500
+
+@app.route("/api/cart/add", methods=["POST"])
+@require_session
+def api_add_to_cart(email):
+    try:
+        data = request.get_json()
+        product_id = data.get("product_id")
+        quantity = data.get("quantity", 1)
+        
+        if not product_id:
+            return jsonify({"error": "Product ID is required."}), 400
+        
+        product = get_product_by_id(product_id)
+        if not product:
+            return jsonify({"error": "Product not found."}), 404
+        
+        if product['stock_quantity'] < quantity:
+            return jsonify({"error": "Insufficient stock."}), 400
+        
+        cart = add_to_cart(email, product_id, quantity, product)
+        return jsonify({"message": "Item added to cart", "cart": cart})
+    except Exception as e:
+        print("Add to cart error:", e)
+        return jsonify({"error": "Failed to add item to cart."}), 500
+
+@app.route("/api/cart/update", methods=["POST"])
+@require_session
+def api_update_cart(email):
+    try:
+        data = request.get_json()
+        product_id = data.get("product_id")
+        quantity = data.get("quantity", 0)
+        
+        if not product_id:
+            return jsonify({"error": "Product ID is required."}), 400
+        
+        cart = update_cart_item(email, product_id, quantity)
+        return jsonify({"message": "Cart updated", "cart": cart})
+    except Exception as e:
+        print("Update cart error:", e)
+        return jsonify({"error": "Failed to update cart."}), 500
+
+@app.route("/api/cart/remove", methods=["POST"])
+@require_session
+def api_remove_from_cart(email):
+    try:
+        data = request.get_json()
+        product_id = data.get("product_id")
+        
+        if not product_id:
+            return jsonify({"error": "Product ID is required."}), 400
+        
+        cart = remove_from_cart(email, product_id)
+        return jsonify({"message": "Item removed from cart", "cart": cart})
+    except Exception as e:
+        print("Remove from cart error:", e)
+        return jsonify({"error": "Failed to remove item from cart."}), 500
+
+@app.route("/api/cart/clear", methods=["POST"])
+@require_session
+def api_clear_cart(email):
+    try:
+        cart = clear_cart(email)
+        return jsonify({"message": "Cart cleared", "cart": cart})
+    except Exception as e:
+        print("Clear cart error:", e)
+        return jsonify({"error": "Failed to clear cart."}), 500
+
+# Orders API endpoints
+@app.route("/api/orders", methods=["POST"])
+@require_session
+def api_create_order(email):
+    try:
+        data = request.get_json()
+        shipping_address = data.get("shipping_address", "").strip()
+        phone = data.get("phone", "").strip()
+        notes = data.get("notes", "").strip()
+        
+        if not shipping_address or not phone:
+            return jsonify({"error": "Shipping address and phone are required."}), 400
+        
+        # Get cart items
+        cart = get_cart(email)
+        if not cart["items"]:
+            return jsonify({"error": "Cart is empty."}), 400
+        
+        # Create order
+        order_id = create_order(email, cart["total"], shipping_address, phone, notes)
+        if not order_id:
+            return jsonify({"error": "Failed to create order."}), 500
+        
+        # Add order items and update stock
+        for item in cart["items"]:
+            add_order_item(order_id, item["product_id"], item["quantity"], item["unit_price"])
+            update_product_stock(item["product_id"], item["quantity"])
+        
+        # Clear cart after successful order
+        clear_cart(email)
+        
+        return jsonify({"message": "Order created successfully", "order_id": order_id})
+    except Exception as e:
+        print("Create order error:", e)
+        return jsonify({"error": "Failed to create order."}), 500
+
+@app.route("/api/orders", methods=["GET"])
+@require_session
+def api_get_orders(email):
+    try:
+        orders = get_user_orders(email)
+        # Get order items for each order
+        for order in orders:
+            order['items'] = get_order_items(order['id'])
+        return jsonify(orders)
+    except Exception as e:
+        print("Orders fetch error:", e)
+        return jsonify({"error": "Failed to fetch orders."}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

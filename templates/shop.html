@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop - FreshFruit</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm fixed-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold text-success" href="/">
+                <i class="fas fa-apple-alt me-2"></i>FreshFruit
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/shop">Shop</a>
+                    </li>
+                </ul>
+                
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link position-relative" href="/cart">
+                            <i class="fas fa-shopping-cart"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="cartBadge">
+                                0
+                            </span>
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown" id="userDropdown" style="display: none;">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user"></i> Account
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/profile">Profile</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">Logout</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item" id="loginNav">
+                        <a class="nav-link" href="/login">Login</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-5 pt-5">
+        <!-- Header -->
+        <div class="row mb-5">
+            <div class="col-lg-8">
+                <h1 class="display-5 fw-bold text-success mb-3">Fresh Organic Fruits</h1>
+                <p class="lead text-muted">Discover our wide selection of premium organic fruits, carefully sourced for the best quality and taste.</p>
+            </div>
+        </div>
+
+        <!-- Search and Filters -->
+        <div class="row mb-4">
+            <div class="col-lg-6">
+                <div class="search-box">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search for fruits...">
+                        <button class="btn btn-success" type="button" onclick="searchProducts()">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="d-flex justify-content-end align-items-center">
+                    <label for="sortSelect" class="form-label me-2 mb-0">Sort by:</label>
+                    <select class="form-select w-auto" id="sortSelect" onchange="sortProducts()">
+                        <option value="name">Name</option>
+                        <option value="price_low">Price: Low to High</option>
+                        <option value="price_high">Price: High to Low</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Products Grid -->
+        <div class="row g-4" id="productsGrid">
+            <!-- Products will be loaded here -->
+        </div>
+
+        <!-- Loading Spinner -->
+        <div class="text-center py-5" id="loadingSpinner">
+            <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading delicious fruits...</p>
+        </div>
+
+        <!-- No Products Message -->
+        <div class="text-center py-5" id="noProductsMessage" style="display: none;">
+            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">No fruits found</h4>
+            <p class="text-muted">Try adjusting your search criteria.</p>
+        </div>
+    </div>
+
+    <!-- Product Modal -->
+    <div class="modal fade" id="productModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="productModalTitle"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <img id="productModalImage" src="" alt="" class="img-fluid rounded">
+                        </div>
+                        <div class="col-md-6">
+                            <h4 id="productModalName" class="fw-bold text-success mb-3"></h4>
+                            <p id="productModalDescription" class="text-muted mb-3"></p>
+                            <div class="mb-3">
+                                <span class="h4 text-success fw-bold">$<span id="productModalPrice"></span></span>
+                                <span class="text-muted">/ <span id="productModalUnit"></span></span>
+                            </div>
+                            <div class="mb-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-box"></i> 
+                                    <span id="productModalStock"></span> available
+                                </small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="quantityInput" class="form-label">Quantity:</label>
+                                <div class="input-group" style="max-width: 150px;">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="changeQuantity(-1)">-</button>
+                                    <input type="number" class="form-control text-center" id="quantityInput" value="1" min="1">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="changeQuantity(1)">+</button>
+                                </div>
+                            </div>
+                            <button class="btn btn-success btn-lg w-100" onclick="addToCartFromModal()">
+                                <i class="fas fa-cart-plus me-2"></i>Add to Cart
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-5 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-4 mb-4">
+                    <h5 class="fw-bold text-success mb-3">
+                        <i class="fas fa-apple-alt me-2"></i>FreshFruit
+                    </h5>
+                    <p class="text-muted">Your trusted source for premium organic fruits.</p>
+                </div>
+                <div class="col-lg-8">
+                    <div class="text-center text-muted">
+                        <p>&copy; 2024 FreshFruit. All rights reserved.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast for notifications -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="addToCartToast" class="toast" role="alert">
+            <div class="toast-header bg-success text-white">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong class="me-auto">Success</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                Item added to cart successfully!
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="/static/js/common.js"></script>
+    <script src="/static/js/shop.js"></script>
+</body>
+</html>
